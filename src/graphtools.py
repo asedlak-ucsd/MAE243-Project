@@ -43,7 +43,7 @@ def subset_lines(lines, N):
     '''
     Returns the set of lines with nodes in N
     '''
-    line_cols = ['id', 'f_bus', 't_bus', 'r', 'x', 'b', 'rate_a', 'kv', 'geometry']
+    line_cols = ['f_bus', 't_bus', 'r', 'x', 'b', 'rate_a', 'geometry']
     # Select all lines with both buses in N
     line_mask = lines['f_bus'].isin(N) & lines['t_bus'].isin(N)
     sub_lines = lines.loc[line_mask, line_cols]
@@ -80,11 +80,6 @@ def subset_loads(loads, timeslice, name):
     # Representative load for a sampled time period
     p_load = loads.loc[:, timeslice]
     
-    # Scale outlier loads to be roughly less than 100MW
-    load_t0 = loads.iloc[:, 0]
-    alpha = np.where(load_t0 > 30, 30/load_t0, 1)
-    p_load = (p_load.T*alpha).T
-
     # Save time period load as a CSV
     p_load.to_csv(join(PATH, "test_system", name))
 
@@ -108,7 +103,7 @@ def subset_system(area, lines, buses, gens, loads):
     
     
     # Select loads (and convert to MW)
-    sub_loads = loads[loads.index.isin(N)] / 1000
+    sub_loads = loads[loads.index.isin(N)].copy()
     # Set all import loads to zero
     sub_loads.loc[list(N_import), :] *= 0
     # Reindex buses 

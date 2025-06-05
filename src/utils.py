@@ -11,12 +11,14 @@ Basic utility functions for reading pandas DataFrames
 # Path to the datasets directories
 PATH = join(os.getcwd(), '..', 'data')
 
-def read_csv(filename, subdir='cats'):
+def read_csv(filename, subdir='cats', standard=True, **kargs):
     '''
     Returns standardized dataframe
     '''
-    df = pd.read_csv(join(PATH, subdir, filename))
-    df = standardize(df)
+    df = pd.read_csv(join(PATH, subdir, filename), **kargs)
+    # Should the dataframe be standardized?
+    if standard:
+        df = standardize(df)
     return df
 
 def read_geocsv(filename):
@@ -65,3 +67,17 @@ def add_id(df):
     '''
     df['id'] = df.index
     return df
+
+def read_loads(filename):
+    # Column names
+    names = pd.date_range(start='2018-01-01 01:00:00-05:00',
+             end='2019-01-01 00:00:00-05:00', freq='h').astype(str)
+    # Read CATS dataframe for loads
+    path = join(PATH, 'cats', filename)
+    loads = pd.read_csv(path, header=None, names=names)
+    loads.index.name = 'bus'
+    loads.index += 1
+    real = lambda x: float(x.split('+')[0])
+    loads = loads.apply(lambda col: col.apply(real))
+    return loads
+        
