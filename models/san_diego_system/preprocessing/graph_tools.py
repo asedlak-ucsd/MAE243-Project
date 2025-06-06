@@ -66,12 +66,6 @@ def subset_lines(lines, N):
                  .reset_index())
     # Convert nominal rating to MVA
     sub_lines['rate_a'] = baseMVA * sub_lines['rate_a']
-    
-    # Cap the line susceptance at 2000 p.u. There seem to be some 
-    # intra-substation lines with very low reactance (e.g., 
-    # transformers) causing infeasible power flow problems)
-    
-    # sub_lines['sus'] = sub_lines['sus'].clip(0, 2000)
 
     return sub_lines
 
@@ -93,6 +87,10 @@ def subset_gens(gens, N, N_import):
     # Remove any generators (e.g., synchronous condensers) with 
     # zero active power output
     sub_gens = sub_gens[sub_gens['pmax'] > 0]
+
+    # Add an indicator for whether generator is an energy storage system (ESS) 
+    storage_gens = ["Hydroelectric Pumped Storage", "Batteries"]
+    sub_gens["ess"] = sub_gens['fueltype'].isin(storage_gens)
     
     return sub_gens
 

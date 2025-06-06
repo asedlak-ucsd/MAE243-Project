@@ -1,8 +1,7 @@
 # Ignore all CATS datasets (as these are very large)
 # 
-models/*/preprocessing/data/*/loads.csv
+models/*/preprocessing/data/
 models/*/outputs/
 .DS_Store
 .ipynb_checkpoints
-
-*/__pycache__
+__pycache__/
