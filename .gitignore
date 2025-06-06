@@ -1,6 +1,7 @@
 # Ignore all CATS datasets (as these are very large)
 # 
-data/cats/*
+models/*/preprocessing/data/*/loads.csv
+models/*/outputs/
 .DS_Store
 .ipynb_checkpoints
 

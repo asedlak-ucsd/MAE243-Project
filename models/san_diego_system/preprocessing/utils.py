@@ -9,7 +9,7 @@ Basic utility functions for reading pandas DataFrames
 '''
 
 # Path to the datasets directories
-PATH = join(os.getcwd(), '..', 'data')
+PATH = join(os.getcwd(), 'data')
 
 def read_csv(filename, subdir='cats', standard=True, **kargs):
     '''
