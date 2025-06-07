@@ -87,33 +87,73 @@ def subset_gens(gens, N, N_import):
     # Remove any generators (e.g., synchronous condensers) with 
     # zero active power output
     sub_gens = sub_gens[sub_gens['pmax'] > 0]
+    # Group all generators of same type and cost at each node into a single generator
+    sub_gens = (sub_gens
+                .groupby(['bus', 'fueltype', 'c2', 'c1', 'c0'])
+                .sum()
+                .reset_index())
 
     # Add an indicator for whether generator is an energy storage system (ESS) 
     storage_gens = ["Hydroelectric Pumped Storage", "Batteries"]
     sub_gens["ess"] = sub_gens['fueltype'].isin(storage_gens)
+    sub_gens['canidate'] = sub_gens['fueltype'].isin(['Batteries', 'Solar Photovoltaic']).astype(int)
     
+    return sub_gens[['bus', 'fueltype', 'c2','c1','c0', 'pmax', 'ess', 'canidate']]
+
+
+def subset_cf(df, fueltype, N, N_import, bus_map):
+    '''
+    Return the subset of capacity factors in N
+    '''
+    sub_df = (df
+                [df.index.isin(N-N_import)]
+                .reset_index()
+                .replace({'bus':bus_map})
+                .set_index('bus')).copy()
+    
+    sub_df['fueltype'] = fueltype
+
+    return sub_df
+
+
+def add_canidate_gens(sub_solar_cf_demand, sub_gens):
+    """
+    Returns a dataframe with canidate solar and ESS added
+    to the generators dataframe.
+    """
+    # Set of nodes that can get canidate solar and/or ESS 
+    G_new = list(sub_solar_cf_demand.index)
+    # Create 2 dataframes for solar and ESS with no existing capacity
+    # Assume default O&M costs
+    G_new_solar = pd.DataFrame({'bus':G_new})
+    G_new_solar['fueltype'] = 'Solar Photovoltaic'
+    G_new_solar[['c2', 'c1', 'c0', 'pmax', 'ess']] = 0
+    G_new_solar['canidate'] = 1
+    
+    G_new_batteries = pd.DataFrame({'bus':G_new})
+    G_new_batteries['fueltype'] = 'Batteries'
+    G_new_batteries[['c2', 'c1', 'c0', 'pmax', 'ess']] = 0.06757, 16.371712, 401.19412, 0, 1
+    G_new_batteries['canidate'] = 1
+    
+    # Add to existing gens
+    sub_gens = pd.concat((sub_gens, G_new_solar, G_new_batteries))
+    sub_gens['gen_id'] = sub_gens.reset_index().index +1
+
     return sub_gens
 
-
-def subset_loads(loads, timeslice, name):
-    '''
-    Select a load for a representative time period
-    '''
-    # Representative load for a sampled time period
-    p_load = loads.loc[:, timeslice]
-    
-    # Save time period load as a CSV
-    p_load.to_csv(join(INPUTS, name))
-
-
-def subset_system(area, lines, buses, gens, loads):
+def subset_system(area, lines, buses, gens, loads, 
+                  solar_cf_gens, solar_cf_demand, wind_cf_gens):
     # Get all buses in the service area
     N, N_import = subset(area, lines, buses)
-
+    
     # Select sach of the datasets
     sub_lines = subset_lines(lines, N)
     sub_gens = subset_gens(gens, N, N_import)
     sub_buses = buses[buses['bus'].isin(N)]
+    
+    # Set of solar and wind generators in service area
+    G_solar = set(sub_gens[sub_gens['fueltype'] == "Solar Photovoltaic"].bus)
+    G_wind = set(sub_gens[sub_gens['fueltype'] == "Onshore Wind Turbine"].bus)
     
     # Map from old bus index to new bus index
     bus_map = dict(zip(sub_buses.index, range(1, len(sub_buses)+1)))
@@ -123,28 +163,39 @@ def subset_system(area, lines, buses, gens, loads):
     sub_lines.loc[:, ['f_bus', 't_bus']] = sub_lines[['f_bus', 't_bus']].replace(bus_map)
     sub_gens.loc[:, 'bus'] = sub_gens['bus'].replace(bus_map)
     
-    
-    # Select loads (and convert to MW)
+    # Select loads
     sub_loads = loads[loads.index.isin(N)].copy()
     # Set all import loads to zero
     sub_loads.loc[list(N_import), :] *= 0
     # Reindex buses 
     sub_loads = sub_loads.reset_index().replace({'bus':bus_map}).set_index('bus')
-
-    # Select 24 hours of load from a representative week in each season
-    # Representative weeks are determined using k-means clustering on all load profiles
-    P = [slice("2018-04-02T01:00:00", "2018-04-03T01:00:00"),
-         slice("2018-08-11T01:00:00", "2018-08-12T01:00:00"), 
-         slice("2018-10-22T01:00:00", "2018-10-23T01:00:00"),
-         slice("2018-12-07T01:00:00", "2018-12-08T01:00:00")]
     
-    for timeslice, name in zip(P, ['sp','su','fa','wi']):
-        subset_loads(sub_loads, timeslice, f"loads_24h_{name}.csv")
+    # Select all solar and wind CFs within the selected area 
+    sub_solar_cf = subset_cf(solar_cf_gens, "Solar Photovoltaic", N, N_import, bus_map)
+    sub_solar_cf_demand = subset_cf(solar_cf_demand, "Solar Photovoltaic", N, N_import, bus_map)
+    sub_wind_cf = subset_cf(wind_cf_gens, "Onshore Wind Turbine", N, N_import, bus_map).drop_duplicates()
+    sub_cf = pd.concat((sub_solar_cf, sub_solar_cf_demand, sub_wind_cf))
+
+    # Add canidate gens to the gens dataframe
+    sub_gens = add_canidate_gens(sub_solar_cf_demand, sub_gens)
+    
+    # Create a variability dataframe with one row for every generator
+    # If there is no match then the gen is not variable and should 
+    # have a cpacity factor of one for all time (i.e. fill NA with 1).
+    sub_cf = pd.merge(sub_cf.reset_index(),
+                           sub_gens[['fueltype', 'bus', 'gen_id']],
+                           on=['bus', 'fueltype'], 
+                           how='right').fillna(1)
+    # Re-organize columns
+    sub_cf = sub_cf.drop(columns=['fueltype', 'bus'])
+    sub_cf = sub_cf[['gen_id']+list(sub_cf.columns)[1:-1]]
 
     # Write all datasets to test system folder
     inputs_dir = join(os.getcwd(), '..', 'inputs')
     sub_buses[sub_buses.columns[:-1]].to_csv(join(INPUTS, "buses.csv"), index=False)
     sub_lines[sub_lines.columns[:-1]].to_csv(join(INPUTS, "lines.csv"), index=False)
     sub_gens.to_csv(join(INPUTS, "generators.csv"), index=False)
+    sub_cf.to_csv(join(INPUTS, "variability.csv"), index=False)
+    sub_loads.to_csv(join(INPUTS, "loads.csv"), index=True)
 
-    return (sub_lines, sub_buses, sub_gens)
+    return (sub_lines, sub_buses, sub_gens, sub_cf)
