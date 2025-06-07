@@ -16,7 +16,7 @@ function load(model_name)
     # Create representative periods
     
     # Time periods sampled in the original frame
-    periods = [collect(1:24*7), collect(2000:(2000+24*7))]
+    periods = [collect(1:24*7)]#, collect(2000:(2000+24*7)), collect(3000:(3000+24*7)), collect(4000:(4000+24*7)), collect(6000:(6000+24*7))]
     T = collect(Iterators.flatten(periods))  # Set of all time periods to sample
     
     # Select periods from loads

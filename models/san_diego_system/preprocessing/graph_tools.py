@@ -97,6 +97,8 @@ def subset_gens(gens, N, N_import):
     storage_gens = ["Hydroelectric Pumped Storage", "Batteries"]
     sub_gens["ess"] = sub_gens['fueltype'].isin(storage_gens)
     sub_gens['canidate'] = sub_gens['fueltype'].isin(['Batteries', 'Solar Photovoltaic']).astype(int)
+    # Set import max to 200MW
+    sub_gens.loc[sub_gens['fueltype'] == 'IMPORT', 'pmax'] = 200
     
     return sub_gens[['bus', 'fueltype', 'c2','c1','c0', 'pmax', 'ess', 'canidate']]
 
@@ -106,7 +108,7 @@ def subset_cf(df, fueltype, N, N_import, bus_map):
     Return the subset of capacity factors in N
     '''
     sub_df = (df
-                [df.index.isin(N-N_import)]
+                [df.index.isin(N)]
                 .reset_index()
                 .replace({'bus':bus_map})
                 .set_index('bus')).copy()
