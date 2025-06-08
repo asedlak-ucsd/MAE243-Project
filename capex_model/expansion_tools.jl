@@ -16,7 +16,7 @@ function load(model_name)
     # Create representative periods
     
     # Time periods sampled in the original frame
-    periods = [collect(1:24*7)]#, collect(2000:(2000+24*7)), collect(3000:(3000+24*7)), collect(4000:(4000+24*7)), collect(6000:(6000+24*7))]
+    periods = [collect(1:24)]#, collect(2000:(2000+24*7)), collect(3000:(3000+24*7)), collect(4000:(4000+24*7)), collect(6000:(6000+24*7))]
     T = collect(Iterators.flatten(periods))  # Set of all time periods to sample
     
     # Select periods from loads
@@ -71,27 +71,56 @@ function save(model, model_name, senario_name,
     # Create outputs folder (if one does not already exist)
     outputs_dir = joinpath(pwd(), "models", model_name, "outputs", senario_name)
     if !(isdir(outputs_dir))
-    	mkdir(outputs_dir)
+        mkdir(outputs_dir)
     end
     
     # Datetimes of columns in the loads dataset
     t_cols = names(loads)
-
+    
     # Get generation data
     sol_gen = table(:GEN, value)
     sol_gen = hcat(sol_gen, gens[:, [:gen_id, :bus, :fueltype]]);
+    
     # Get load sheding data 
     sol_shed = table(:SHED, value)
     sol_shed[:, :gen_id] .= -1
     sol_shed[:, :bus] = 1:nrow(sol_shed)
     sol_shed[:, :fueltype] .= "Load Shed"
+    
     # Join load sheding and generation
     sol_gen = vcat(sol_gen, sol_shed)
-
+    
+    # Negative generation from charging energy storage systems
+    sol_charge = -1 .* table(:CHARGE, value);
+    sol_charge = hcat(sol_charge, gens[gens.ess .== 1, [:gen_id, :bus]])
+    sol_charge[:, :fueltype] .= "Energy Storage"
+    
+    # Join charging to generation
+    sol_gen = vcat(sol_gen, sol_charge)
+    
+    # Get installed capacity at all canidate sites
+    #sol_capacity = copy(gens[gens.canidate .== 1, [:gen_id, :bus, :fueltype]])
+    #sol_capacity[:, :capacity] = value.(model[:CAP]).data
+    
+    # Get state of charge for energy storage systems
+    sol_soc = table(:SOC, value)
+    sol_soc = hcat(sol_soc, gens[gens.ess .== 1, [:gen_id, :bus, :fueltype]])
+    
     # Get prices at each node
     sol_price = table(:cBalance, dual)
+    
+    # Save all costs expressions
+    costs = Dict()
+    ##for expression in [:eFixedCostsSolar, :eFixedCostsStorage, :eNSECosts, :eTotalCosts, :eVariableCosts]
+     #   costs[expression] = value(model[expression])
+    #end
+    
+    sol_costs = DataFrame(costs)
 
     # Write results
     CSV.write(joinpath(outputs_dir, "generation.csv"), sol_gen)
     CSV.write(joinpath(outputs_dir, "prices.csv"), sol_price)
+    #CSV.write(joinpath(outputs_dir, "capacity.csv"), sol_capacity)
+    CSV.write(joinpath(outputs_dir, "soc.csv"), sol_soc)
+    CSV.write(joinpath(outputs_dir, "costs.csv"), sol_costs)
 end
