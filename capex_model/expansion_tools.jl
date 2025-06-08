@@ -16,7 +16,7 @@ function load(model_name)
     # Create representative periods
     
     # Time periods sampled in the original frame
-    periods = [collect(1:24)]#, collect(2000:(2000+24*7)), collect(3000:(3000+24*7)), collect(4000:(4000+24*7)), collect(6000:(6000+24*7))]
+    periods = [collect(1:24), collect(2000:2000+24)]#, collect(2000:(2000+24*7)), collect(3000:(3000+24*7)), collect(4000:(4000+24*7)), collect(6000:(6000+24*7))]
     T = collect(Iterators.flatten(periods))  # Set of all time periods to sample
     
     # Select periods from loads
@@ -99,8 +99,8 @@ function save(model, model_name, senario_name,
     sol_gen = vcat(sol_gen, sol_charge)
     
     # Get installed capacity at all canidate sites
-    #sol_capacity = copy(gens[gens.canidate .== 1, [:gen_id, :bus, :fueltype]])
-    #sol_capacity[:, :capacity] = value.(model[:CAP]).data
+    sol_capacity = copy(gens[gens.canidate .== 1, [:gen_id, :bus, :fueltype]])
+    sol_capacity[:, :capacity] = value.(model[:CAP]).data
     
     # Get state of charge for energy storage systems
     sol_soc = table(:SOC, value)
@@ -111,16 +111,16 @@ function save(model, model_name, senario_name,
     
     # Save all costs expressions
     costs = Dict()
-    ##for expression in [:eFixedCostsSolar, :eFixedCostsStorage, :eNSECosts, :eTotalCosts, :eVariableCosts]
-     #   costs[expression] = value(model[expression])
-    #end
+    for expression in [:eFixedCostsSolar, :eFixedCostsStorage, :eNSECosts, :eTotalCosts, :eVariableCosts]
+        costs[expression] = value(model[expression])
+    end
     
     sol_costs = DataFrame(costs)
 
     # Write results
     CSV.write(joinpath(outputs_dir, "generation.csv"), sol_gen)
     CSV.write(joinpath(outputs_dir, "prices.csv"), sol_price)
-    #CSV.write(joinpath(outputs_dir, "capacity.csv"), sol_capacity)
+    CSV.write(joinpath(outputs_dir, "capacity.csv"), sol_capacity)
     CSV.write(joinpath(outputs_dir, "soc.csv"), sol_soc)
     CSV.write(joinpath(outputs_dir, "costs.csv"), sol_costs)
 end
