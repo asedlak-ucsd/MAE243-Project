@@ -35,13 +35,31 @@ function expansion(buses, lines, gens, loads, variability, P, W)
         """
         return gens[g,:pmax] + (g ∈ G_new ? CATS_Model[:CAP][g] : 0)
     end
+
+    function status(i,j,t)
+        """
+        Returns 1 if line (i,j) is energized at time t
+        and 0 if the line is de-energized
+        """
+        if t in T[1:end-24]
+            return 1
+        else
+            return line(i,j,:on)
+        end
+    end
     
     ##### SETS ####
+    ramp_limited = ["Conventional Hydroelectric", "Natural Gas Fired Combustion Turbine",
+        "Other Waste Biomass", "Landfill Gas", "Natural Gas Internal Combustion Engine",
+        "Natural Gas Fired Combined Cycle", "Other Natural Gas", "Hydroelectric Pumped Storage",
+        "Petroleum Liquids"]
+    
     # Generators #
     G = gens[:, :gen_id]
     G_new = gens[gens.canidate .==1, :gen_id]
     G_ess = gens[gens.ess .== 1, :gen_id]
     G_solar = gens[gens.fueltype .== "Solar Photovoltaic", :gen_id]
+    G_ramp = gens[gens.fueltype .∈ Ref(ramp_limited), :gen_id]
     
     # Lines and Buses #
     N = 1:nrow(buses)
@@ -100,7 +118,7 @@ function expansion(buses, lines, gens, loads, variability, P, W)
     # )
     # @constraint(CATS_Model, cMaxCapStorage[g ∈ intersect(G_new, G_ess)],
     #     CAP[g] ≤ max_battery_cap
-    # )
+    # )   
     
     #########################
     #### BATTERY STORAGE ####
@@ -129,7 +147,7 @@ function expansion(buses, lines, gens, loads, variability, P, W)
     
     # Max line flow must be less than the nominal (RATE A) of the line
     @constraint(CATS_Model, cLineLimits[(i,j) ∈ L, t ∈ T], 
-        FLOW[(i,j),t] ≤ line(i,j,:rate_a)) 
+        FLOW[(i,j),t] ≤ line(i,j,:rate_a)*status(i,j,t)) 
     
     # Angle limited to less than 60 degrees 
     #@constraint(CATS_Model, cAngleLimitsMax[(i,j) ∈ L, t ∈ T], 

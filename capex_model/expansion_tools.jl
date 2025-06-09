@@ -12,20 +12,16 @@ function load(model_name)
     gens = CSV.read(joinpath(inputs_dir, "generators.csv"), DataFrame);
     loads = CSV.read(joinpath(inputs_dir, "loads.csv"), DataFrame);
     variability = CSV.read(joinpath(inputs_dir, "variability.csv"), DataFrame);
-
-    # Set of representative weeks
-    #weeks = [18, 31]
-    #weights = [38/52, 14/38]
-    # Time periods sampled in the original frame
-    #periods = [collect(i*24*7:(i+1)*24*7) for i in weeks]
-
-    periods = [collect(1:24)]
-    weights = [1]
     
+    # Time periods sampled in the original frame
+    # periods = [collect(18*24*7:19*24*7), collect(31*24*7:32*24*8)]
+    #W = [38*7 .* ones(24*7), 14*7 .* ones(24*7), ones(24)] # Weight for each period
+    
+    periods = [collect(1:24)]
+    W = ones(24)
     T = collect(Iterators.flatten(periods))  # Set of all time periods to sample
     
-    W = [w*ones(24*7) for w in weights] # Weight for each period
-    W = collect(Iterators.flatten(W))
+    
     
     # Select periods from loads
     loads = loads[:, 2:8761][:, T]
