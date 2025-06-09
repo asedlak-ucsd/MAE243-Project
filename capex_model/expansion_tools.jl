@@ -13,11 +13,19 @@ function load(model_name)
     loads = CSV.read(joinpath(inputs_dir, "loads.csv"), DataFrame);
     variability = CSV.read(joinpath(inputs_dir, "variability.csv"), DataFrame);
 
-    # Create representative periods
-    
+    # Set of representative weeks
+    #weeks = [18, 31]
+    #weights = [38/52, 14/38]
     # Time periods sampled in the original frame
-    periods = [collect(1:24), collect(2000:2000+24)]#, collect(2000:(2000+24*7)), collect(3000:(3000+24*7)), collect(4000:(4000+24*7)), collect(6000:(6000+24*7))]
+    #periods = [collect(i*24*7:(i+1)*24*7) for i in weeks]
+
+    periods = [collect(1:24)]
+    weights = [1]
+    
     T = collect(Iterators.flatten(periods))  # Set of all time periods to sample
+    
+    W = [w*ones(24*7) for w in weights] # Weight for each period
+    W = collect(Iterators.flatten(W))
     
     # Select periods from loads
     loads = loads[:, 2:8761][:, T]
@@ -33,7 +41,7 @@ function load(model_name)
         p_start = p_start + p_end
     end
 
-    return (buses, lines, gens, loads, variability, P)
+    return (buses, lines, gens, loads, variability, P, W)
 end
 
 

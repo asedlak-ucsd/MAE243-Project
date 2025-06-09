@@ -1,4 +1,4 @@
-function expansion(buses, lines, gens, loads, variability, P)
+function expansion(buses, lines, gens, loads, variability, P, W)
     """
     Solve capacity expansion with CATS.
     
@@ -159,11 +159,11 @@ function expansion(buses, lines, gens, loads, variability, P)
 
     # The weighted operational costs of running each generator
     @expression(CATS_Model, eVariableCosts,
-        sum(gens[g,:c1] * GEN[g,t] for g ∈ G, t ∈ T))
+        sum(W[t] * gens[g,:c1] * GEN[g,t] for g ∈ G, t ∈ T))
     
     # The weighted operational costs of shedding load/non-served energy (NSE)
     @expression(CATS_Model, eNSECosts,
-        sum(shed_cost * SHED[i,t] for i ∈ N, t ∈ T))
+        sum(W[t] * shed_cost * SHED[i,t] for i ∈ N, t ∈ T))
 
     # Fixed costs of all solar investments
 	@expression(CATS_Model, eFixedCostsSolar,
