@@ -7,3 +7,6 @@ This repository contains code to run a preliminary test model of capacity expans
 
 # Data
 This model leverages data from several sources. To run the prepossessing script please take the following steps. CATS, `lines.json`, `buses.csv`, and `gens.csv` should be downloaded directly from the [CATS model repository](https://github.com/WISPO-POP/CATS-CaliforniaTestSystem/tree/master) and placed in a folder named `cats` within the data directory. Data for power flow, specifically generator costs can be found in `CaliforniaTestSystem.m`. To extract this data run the file in MATLAB and save the `gencost` and `bus` matrices to a folder named `opf` within the data directory. An IOU shapefile is needed to extract generators in the SDGE area, it can be downloaded from the [CEC website](https://cecgis-caenergy.opendata.arcgis.com/datasets/CAEnergy::electric-load-serving-entities-iou-pou/about). To download, loads and capacity factors please contact the REAM Lab.  These files are currently being developed for related research but are not **yet** publicly available. 
+
+
+link for cpuc data https://www.cpuc.ca.gov/industries-and-topics/wildfires/fire-threat-maps-and-fire-safety-rulemaking 
