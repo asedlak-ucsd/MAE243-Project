@@ -49,17 +49,12 @@ function expansion(buses, lines, gens, loads, variability, P, W)
     end
     
     ##### SETS ####
-    ramp_limited = ["Conventional Hydroelectric", "Natural Gas Fired Combustion Turbine",
-        "Other Waste Biomass", "Landfill Gas", "Natural Gas Internal Combustion Engine",
-        "Natural Gas Fired Combined Cycle", "Other Natural Gas", "Hydroelectric Pumped Storage",
-        "Petroleum Liquids"]
     
     # Generators #
     G = gens[:, :gen_id]
     G_new = gens[gens.canidate .==1, :gen_id]
     G_ess = gens[gens.ess .== 1, :gen_id]
     G_solar = gens[gens.fueltype .== "Solar Photovoltaic", :gen_id]
-    G_ramp = gens[gens.fueltype .∈ Ref(ramp_limited), :gen_id]
     
     # Lines and Buses #
     N = 1:nrow(buses)
@@ -81,11 +76,10 @@ function expansion(buses, lines, gens, loads, variability, P, W)
     η_discharge = 0.91 # Discharging efficiecy
     
     # Parameters for investment #
-    shed_cost = 1000 
-    solar_cost = 147.5
-    battery_cost = 147.5 
-    max_solar_cap = 200
-    max_battery_cap = 400
+    shed_cost = 9000 
+    solar_cost = 85_000
+    battery_cost = 110_000 # Assuming 4 hour storage
+    budget = 100*1e6 # Budget in dollars
 
     ########################
     #####     MODEL    #####
@@ -103,7 +97,7 @@ function expansion(buses, lines, gens, loads, variability, P, W)
         CHARGE[G_ess,T] ≥ 0 # Chargeing of ESS 
         CAP[G_new] ≥ 0      # New capacity for each canidate site
     end)
-
+    println("Model init okay.")
     # Max generation constraint
     @constraint(CATS_Model, cMaxGen[g ∈ G, t ∈ T], 
         GEN[g,t] ≤ variability[g,t]*capacity(g)
@@ -119,7 +113,7 @@ function expansion(buses, lines, gens, loads, variability, P, W)
     # @constraint(CATS_Model, cMaxCapStorage[g ∈ intersect(G_new, G_ess)],
     #     CAP[g] ≤ max_battery_cap
     # )   
-    
+    println("Max constraints okay.")
     #########################
     #### BATTERY STORAGE ####
     #########################
@@ -138,7 +132,7 @@ function expansion(buses, lines, gens, loads, variability, P, W)
     @constraint(CATS_Model, cStateOfCharge[g ∈ G_ess, t ∈ T],
         SOC[g,t] == SOC[g,prev(t)] + CHARGE[g,t]*η_charge - GEN[g,t]/η_charge
     )
-    
+    println("Storage constraints okay.")
     ########################
     ######## DC OPF ########
     ########################
@@ -170,7 +164,7 @@ function expansion(buses, lines, gens, loads, variability, P, W)
         - sum(CHARGE[g,t] for g ∈ sel(G_ess, i))
          == sum(FLOW[(i,j),t] for j ∈ J(i))
     )
-
+    println("Power flow constraints okay.")
     #########################
     ####### OBJECTIVE #######
     #########################
@@ -194,9 +188,15 @@ function expansion(buses, lines, gens, loads, variability, P, W)
     # Minimize the sum of investment and O&M costs 
 	@expression(CATS_Model, eTotalCosts,
 		eVariableCosts + eNSECosts + eFixedCostsStorage + eFixedCostsSolar)
+
+    @constraint(CATS_Model, cBudget,
+        eFixedCostsStorage + eFixedCostsSolar ≤ budget
+    )
     
 	@objective(CATS_Model, Min, eTotalCosts)
-
+    println("Model setup done! Starting optimization...")
+    sleep(0.5) # Sleep so final print statements appear to user
+    
     optimize!(CATS_Model)
 
     return CATS_Model

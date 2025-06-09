@@ -14,14 +14,16 @@ function load(model_name)
     variability = CSV.read(joinpath(inputs_dir, "variability.csv"), DataFrame);
     
     # Time periods sampled in the original frame
-    # periods = [collect(18*24*7:19*24*7), collect(31*24*7:32*24*8)]
-    #W = [38*7 .* ones(24*7), 14*7 .* ones(24*7), ones(24)] # Weight for each period
+    p1_days = 5 # Number of nominal load days
+    p2_days = 4 # Number of high load days
     
-    periods = [collect(1:24)]
-    W = ones(24)
+    periods = [collect(18*24*7:18*24*7-1 + 24*p1_days), collect(31*24*7:31*24*7-1 + 24*(p2_days+1))]
+    W = [(7/p1_days)*38 .* ones(24*p1_days), (7/p2_days)*14 .* ones(24*p2_days), ones(24)] # Weight for each period
+    W = collect(Iterators.flatten(W))
+    
+    #periods = [collect(1:24)]
+    #W = ones(24) .* 52.13
     T = collect(Iterators.flatten(periods))  # Set of all time periods to sample
-    
-    
     
     # Select periods from loads
     loads = loads[:, 2:8761][:, T]
