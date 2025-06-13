@@ -79,7 +79,7 @@ function expansion(buses, lines, gens, loads, variability, P, W)
     shed_cost = 9000 
     solar_cost = 85_000
     battery_cost = 110_000 # Assuming 4 hour storage
-    budget = 100*1e6 # Budget in dollars
+    budget = 0# 100*1e6 # Budget in dollars
 
     ########################
     #####     MODEL    #####
@@ -97,7 +97,7 @@ function expansion(buses, lines, gens, loads, variability, P, W)
         CHARGE[G_ess,T] ≥ 0 # Chargeing of ESS 
         CAP[G_new] ≥ 0      # New capacity for each canidate site
     end)
-    println("Model init okay.")
+    println("\nModel init okay.")
     # Max generation constraint
     @constraint(CATS_Model, cMaxGen[g ∈ G, t ∈ T], 
         GEN[g,t] ≤ variability[g,t]*capacity(g)
@@ -106,13 +106,6 @@ function expansion(buses, lines, gens, loads, variability, P, W)
     @constraint(CATS_Model, cMaxShed[i ∈ N, t ∈ T], 
         SHED[i,t] ≤ loads[i,t]
     )
-    # Max amount of new capacity for each canidate site
-    # @constraint(CATS_Model, cMaxCapSolar[g ∈ intersect(G_new, G_solar)],
-    #     CAP[g] ≤ max_solar_cap
-    # )
-    # @constraint(CATS_Model, cMaxCapStorage[g ∈ intersect(G_new, G_ess)],
-    #     CAP[g] ≤ max_battery_cap
-    # )   
     println("Max constraints okay.")
     #########################
     #### BATTERY STORAGE ####
@@ -144,12 +137,12 @@ function expansion(buses, lines, gens, loads, variability, P, W)
         FLOW[(i,j),t] ≤ line(i,j,:rate_a)*status(i,j,t)) 
     
     # Angle limited to less than 60 degrees 
-    #@constraint(CATS_Model, cAngleLimitsMax[(i,j) ∈ L, t ∈ T], 
-    #    (THETA[i,t] - THETA[j,t]) ≤  θlim
-    #)
-    #@constraint(CATS_Model, cAngleLimitsMin[(i,j) ∈ L, t ∈ T], 
-    #    (THETA[i,t] - THETA[j,t]) ≥ -θlim
-    #)
+    @constraint(CATS_Model, cAngleLimitsMax[(i,j) ∈ L, t ∈ T], 
+        (THETA[i,t] - THETA[j,t]) ≤  θlim
+    )
+    @constraint(CATS_Model, cAngleLimitsMin[(i,j) ∈ L, t ∈ T], 
+        (THETA[i,t] - THETA[j,t]) ≥ -θlim
+    )
                     
     # Flow is governed by angle difference between buses
     @constraint(CATS_Model, cLineFlows[(i,j) ∈ L, t ∈ T],
